@@ -1,0 +1,348 @@
+---
+title: "Plantilla para nuestro informe"
+author: "Daniel Casino, Laura Borrás y Laura Albert"
+date: "Diciembre de 2020 (actualizado el `r format(Sys.time(), '%d-%m-%Y')`)"
+output:
+  html_document:
+    theme: paper
+    highlight: textmate 
+    toc: true
+    toc_depth: 3 
+    toc_float: 
+      collapsed: true
+      smooth_scroll: true
+    self_contained: true
+    number_sections: false
+    df_print: kable
+    code_download: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r packages-setup, include = FALSE}
+library(tidyverse)
+library(klippy)  #- remotes::install_github("rlesur/klippy")
+library(knitr)
+library(readxl)
+library(reactable)
+library(ggplot2)
+library(stringi)
+library(ggThemeAssist)
+library(plotly)
+library(patchwork)
+library(ggrepel)
+library(sf)
+```
+
+```{r chunk-setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE, 
+                      #results = "hold",
+                      cache = FALSE, cache.path = "/caches/", comment = "#>",
+                      #fig.width = 7, #fig.height= 7,   
+                      #out.width = 7, out.height = 7,
+                      collapse = TRUE,  fig.show = "hold",
+                      fig.asp = 7/9, out.width = "60%", fig.align = "center")
+knitr::opts_chunk$set(dev = "png", dev.args = list(type = "cairo-png"))
+```
+
+```{r options-setup, include = FALSE}
+options(scipen = 999) 
+options("yaml.eval.expr" = TRUE) 
+```
+
+
+```{r klippy, echo = FALSE}
+klippy::klippy(position = c("top", "right")) #- remotes::install_github("rlesur/klippy")
+```
+
+-----------------
+
+<br>
+
+Este es nuestro informe para la presentación del día 18 de diciembre. Aquí comentaremos de que trata nuestro trabajo y las transformaciones que hemos realizado, así como, el código de estas y los diferentes paquetes utilizados.
+
+## 1. INTRODUCCIÓN
+
+Nuestro trabajo consiste en la manipulación de datos del INE en lo referente a nombres y apellidos en España. 
+Para esto, descargaremos desde R los datos de frecuencia de nombres y apellidos españoles del INE y también descargaremos un excel de forma manual de la distribución geográfica provincial de nuestro nombre y primer apellido.
+
+
+## 2.  CARGAMOS DATOS Y PAQUETES
+
+Vamos a cargar diferentes paquetes que iremos utilizando a lo largo del trabajo.
+
+```{r echo=TRUE, eval= FALSE}
+
+library(tidyverse)
+library(readxl)
+library(reactable)
+library(ggplot2)
+library(stringi)
+library(ggThemeAssist)
+library(plotly)
+
+```
+
+Ahora descargaremos los diferentes informes para manipularlos y los transformaremos para poder hacerlos visibles. 
+Tendremos 2 dataframes de apellidos, uno para frecuencia >100 y otros para frecuencia <100 y >20.
+Así mismo, tendremos 2 dataframes de nombres, uno para hombres y otro para mujeres.
+```{r echo = TRUE, eval=TRUE}
+#APELLIDOS
+#- descargamos los datos en "./Datos/frecuencia.xls"
+url <- "https://www.ine.es/daco/daco42/nombyapel/apellidos_frecuencia.xls"
+archivo_de_destino <- here::here("Datos", "frecuencia.xls")
+download.file(url, archivo_de_destino)
+
+#- Vamos a importar los datos tipo excel con la función readxl y mediante el sheet=1 cogeremos la HOJA 1 del excel y mediante el range, cogeremos desde el Orden hasta el último total, ya que, si importamos directamente el EXCEL tendriamos que eliminar algunas de las primeras filas, por lo que, mediante esto ya lo tenemos como queremos.
+df_apellidos1 <- read_excel ("./Datos/frecuencia.xls", sheet=1, range="A5:E25798")
+df_apellidos2 <- read_excel ("./Datos/frecuencia.xls", sheet=2, range="A5:E50393")
+
+
+#NOMBRES
+url2 <- "https://www.ine.es/daco/daco42/nombyapel/nombres_por_edad_media.xls"
+archivo_de_destino2 <- here::here("Datos", "frecuencianombre.xls")
+download.file(url2, archivo_de_destino2)
+
+# Vamos a importar los datos tipo excel con la función readxl y mediante el sheet=1 cogeremos la HOJA 1 del excel y mediante el range, cogeremos desde el Orden hasta el último total, ya que, si importamos directamente el EXCEL tendriamos que eliminar algunas de las primeras filas, por lo que, mediante esto ya lo tenemos como queremos.
+df_nombre1 <- read_excel ("./Datos/frecuencianombre.xls", sheet=1, range="A7:D25790")
+df_nombre <- read_excel ("./Datos/frecuencianombre.xls", sheet=2, range="A7:D26499")
+
+
+
+#Daniel y Laura frecuencia y provincias
+df_Daniel <- read_excel ("./Datos/Daniel_Laura.xlsx", sheet=1)
+df_Laura <- read_excel ("./Datos/Daniel_Laura.xlsx", sheet=2)
+
+
+
+
+```
+
+
+## 3. MODIFICAMOS NUESTROS DATAFRAMES
+Si abriesemos los dataframes de apellidos, vemos que aparecen varias variables que se llaman "Total" las cuales van referidas a algo. Vamos a modificar los nombre por aquello a lo que correspondes esos "totales".
+```{r echo = TRUE, eval=TRUE}
+
+#Modificamos los nombres de las columnas que se llaman total, por aquello a lo que le corresponde (es un total, pero un total de algo, lo llamaremos conforme ese ALGO)
+df_apellidos1 <- df_apellidos1 %>% rename(Frec_1er_Apellido = Total...3,
+  Frec_2o_Apellido= Total...4,
+  Frec_Ambos_Apellidos= Total...5)
+
+df_apellidos2 <- df_apellidos2 %>% rename(Frec_1er_Apellido = Total...3,
+  Frec_2o_Apellido= Total...4,
+  Frec_Ambos_Apellidos= Total...5)
+
+
+df_apellidosmodif <- suppressWarnings(transform(df_apellidos2, Frec_2o_Apellido= as.numeric(Frec_2o_Apellido),
+  Frec_Ambos_Apellidos=as.numeric(Frec_Ambos_Apellidos)
+  )
+  )
+```
+
+## 4. TRANSFORMACIONES
+### 4.1 TABLAS
+Ahora, vamos a manipular nuestros dataframes para hacer ciertas construcciones, en este caso empezaremos con unas tablas. Estas, van a recoger los nombres y apellidos agrupados por la letra que empiecen y con distintos colores de celda dependiendo la frecuencia, siendo verde frecuencia alta, naranja frecuencia media y rojo frecuencia baja, es decir, poco frecuentes.
+
+Primero de todo, necesitaremos unir ambas tablas, tanto de nombres como de apellidos en una sola.
+
+```{r echo= TRUE, eval=TRUE}
+#APELLIDOS
+df_apellidos_conjuntos <- full_join(df_apellidos1, df_apellidosmodif, by= c("Orden","Apellido","Frec_1er_Apellido","Frec_2o_Apellido","Frec_Ambos_Apellidos"))
+
+df_apellidos_conjuntos2 <- df_apellidos_conjuntos %>%
+  mutate(Letra= stri_sub(Apellido,1,1)) %>%
+  arrange(Letra)
+
+
+#NOMBRES
+df_nombreH<- df_nombre1 %>%
+  mutate(Sexo="Hombre") %>%
+  rename(Edad= `Edad Media (*)`)%>%
+  select(-c(Orden))
+
+df_nombreM <- df_nombre %>%
+  mutate(Sexo="Mujer") %>%
+  rename(Edad= `Edad Media (*)`) %>%
+  select(-c(Orden))
+
+
+df_NombresJuntos<- full_join(df_nombreH, df_nombreM, by= c("Nombre","Frecuencia","Edad","Sexo")) %>% arrange(desc(Frecuencia))
+
+df_NombresJuntos2 <- df_NombresJuntos %>%
+  mutate(Letra= stri_sub(Nombre,1,1)) %>%
+  arrange(Letra)
+
+```
+
+De esta forma, haremos una tabla con buscador de NOMBRES y otra para APELLIDOS
+
+```{r echo = FALSE, eval=TRUE}
+
+
+reactable(df_NombresJuntos2,
+  columns= list(Frecuencia= colDef(
+  style = function(value, index, name) {
+    if (is.numeric(value) && value >= 50000) {
+      list(fontWeight = "bold", background = "rgba(0,255,0,0.3)")
+
+    }else if (is.numeric(value) && value >= 10000 ){
+      list(fontWeight="bold", background="rgba(255,255,0,0.3)")
+
+    }else{
+        list(fontWeight="bold", background="rgba(255,0,0,0.3)")
+      }
+  })
+),resizable= TRUE,
+  showPageSizeOptions = TRUE,
+  outlined = TRUE,
+  searchable = TRUE,
+  groupBy = "Letra",
+  paginationType = "simple",
+  language = reactableLang(
+    searchPlaceholder = "Buscar...",
+    noData = "No hay resultados",
+    pageInfo = "{rowStart} de {rowEnd} de las {rows} entradas",
+    pagePrevious = "\u276e",
+    pageNext = "\u276f",
+    pagePreviousLabel = "Página anterior",
+    pageNextLabel = "Página siguiente"
+  )
+  )
+
+```
+
+```{r echo = FALSE, eval=TRUE}
+
+reactable(
+  df_apellidos_conjuntos2,
+  groupBy = "Letra",
+  searchable = TRUE,
+  paginationType = "simple",
+  language = reactableLang(
+    searchPlaceholder = "Buscar...",
+    noData = "No hay resultados",
+    pageInfo = "{rowStart} de {rowEnd} de las {rows} entradas",
+    pagePrevious = "\u276e",
+    pageNext = "\u276f",
+    pagePreviousLabel = "Página anterior",
+    pageNextLabel = "Página siguiente"
+  )
+)
+
+```
+
+### 4.2. GRÁFICAS
+Para los gráficos, haremos 3 gráficos de barras. El primero estará relacionado con los 10 apellidos más frecuentes, el segundo con los 10 nombres más frecuentes y el tercero será un gráfico de los 10 nombres menos comunes y los 10 que más.
+
+Primero, necesitaremos transformar los datos
+```{r echo= TRUE, eval=TRUE}
+#APELLIDOS
+df_apellidos <- df_apellidos1 %>% select(Apellido, Frec_1er_Apellido, Frec_2o_Apellido) %>% mutate(Frec_Total= Frec_1er_Apellido + Frec_2o_Apellido) %>% slice_max(Frec_Total, n=10) %>% mutate(Apellido = forcats::as_factor(Apellido)) %>% mutate(Apellido = forcats::fct_reorder(Apellido, Frec_Total))
+
+
+p <- ggplot(df_apellidos, aes(Apellido, Frec_Total)) + geom_col(fill = "steelblue") + coord_flip()
+
+
+#NOMBRES
+df_nombres <- full_join(df_nombre, df_nombre1)
+
+df_nombres3 <-df_nombres %>% select(Nombre, Frecuencia) %>% slice_max(Frecuencia, n=10) %>% mutate(Nombre = forcats::as_factor(Nombre)) %>% mutate(Nombre = forcats::fct_reorder(Nombre, Frecuencia))
+
+s <- ggplot(df_nombres3, aes(Nombre, Frecuencia)) + geom_col(fill = "steelblue") + coord_flip()
+
+
+#10 MÁS FRECUENTES Y 10 QUE MENOS
+df_nombres_edadmedia <- df_nombres %>% select(Nombre, `Edad Media (*)`) %>% arrange(desc(`Edad Media (*)`)) %>%
+  slice(c(1,2,3,4,5,6,7,8,9,10,n()-9,n()-8,n()-7,n()-6,n()-5,n()-4,n()-3,n()-2,n()-1, n()))%>%
+  mutate(Nombre = forcats::as_factor(Nombre)) %>% mutate(Nombre = forcats::fct_reorder(Nombre, `Edad Media (*)`))
+
+r <- ggplot(df_nombres_edadmedia, aes(Nombre, `Edad Media (*)`)) + geom_col(fill="steelblue") + coord_flip()
+
+```
+
+Mostramos los gráficos:
+```{r echo=FALSE, eval=TRUE}
+p + theme(panel.grid.major = element_line(colour = "white",
+  size = 1), panel.grid.minor = element_line(size = 1),
+  axis.title = element_text(size = 14),
+  axis.text = element_text(size = 11, face = "bold.italic",
+    colour = "gray25"), plot.title = element_text(size = 15,
+      hjust = 0.5, vjust = 2,5), plot.background = element_rect(fill = "lightyellow",
+        colour = NA)) +labs(title = "LOS 10 APELLIDOS MÁS FRECUENTES", caption = "Datos provenientes del INE")
+
+```
+
+```{r echo=FALSE, eval=TRUE}
+
+s + theme(panel.grid.major = element_line(size = 0.9),
+  panel.grid.minor = element_line(size = 0.9),
+  axis.title = element_text(size = 13,
+    face = "bold.italic"), axis.text = element_text(size = 12,
+      face = "bold.italic"), plot.title = element_text(face = "bold.italic",
+        hjust = 0.5, vjust = 1.5), panel.background = element_rect(fill = "gray87",
+          size = 0.8), plot.background = element_rect(fill = "aliceblue",
+            size = 0.6)) +labs(title = "LOS 10 NOMBRES MÁS FRECUENTES",  caption = "Datos provenientes del INE")
+
+```
+
+
+```{r echo=FALSE, eval=TRUE}
+ggplotly(r)
+```
+
+
+### 4.3. MAPAS
+Cargaremos primero las geometrías de la carpeta Datos
+```{r echo=TRUE, eval=TRUE}
+load("./Datos/geometrias_clase_10.RData")
+```
+Y ahora haremos un mapa para la frecuencia por provincias del nombre de Daniel:
+```{r echo=TRUE, eval=TRUE}
+
+#Hacemos un mapa de coropletas del país para el total del nombre "Daniel"
+dfDaniel <- full_join(df_Daniel, Provincias, by = c("Provincia" = "NombreProv"))
+
+```
+
+```{r echo=FALSE, eval=TRUE}
+ggplot(data = dfDaniel, aes(geometry = geometry)) + geom_sf(aes(fill = Total)) + scale_fill_viridis_c(option = "inferno", direction = -1)
+```
+
+Y ahora otro mapa para la frecuencia por provincias del nombre de Laura:
+```{r echo=TRUE, eval=TRUE}
+
+#Hacemos otro mapa de coropletas para el total del nombre "Laura".
+dfLaura<-full_join(df_Laura, Provincias, by = c("Provincia" = "NombreProv"))
+
+```
+
+```{r echo=FALSE, eval=TRUE}
+ggplot(data = dfLaura, aes(geometry = geometry)) + geom_sf(aes(fill = Total)) + scale_fill_viridis_c(option = "inferno", direction = -1)
+```
+
+
+
+## 5. Conclusión
+
+Las conclusiones son ...
+
+
+
+## Referencias
+
+Para la realización del trabajo he utilizado:
+
+- 
+
+- 
+
+
+----------------
+
+<br><br>
+
+Para acabar este chunk para incluir tu `session info`:
+
+```{r}
+sessioninfo::session_info() %>% details::details(summary = 'current session info') 
+```
