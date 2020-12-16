@@ -4,7 +4,7 @@ output:
     variant: markdown_github
 ---
 
-## Transparencias del trabajo en equipo de la asignatura "Big Data" 
+## Transparencias del trabajo en equipo de la asignatura "Big Data"  
 
 Repo utilizado para elaborar las transparencias del trabajo en equipo para la asignatura "Programación y manejo de datos en la era del Big Data" de la Universitat de València durante el curso 2020-2021. La página web de la asignatura puede verse aquí: <https://perezp44.github.io/intro-ds-20-21-web/>.
 
