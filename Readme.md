@@ -1,4 +1,4 @@
-Transparencias del trabajo en equipo de la asignatura “Big Data”
+Transparencias del trabajo en equipo de la asignatura “Big Data” 
 ----------------------------------------------------------------
 
 Repo utilizado para elaborar las transparencias del trabajo en equipo
